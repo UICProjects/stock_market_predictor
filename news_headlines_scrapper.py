@@ -1,5 +1,6 @@
 #!/usr/local/bin/python3.11
 
+import csv
 import os
 import requests
 from datetime import datetime
@@ -10,6 +11,32 @@ from decouple import config
 from langdetect import detect
 import time
 import bs4 as bs
+
+def save_to_csv(news_data, file_name):
+    if not news_data:
+        print("No data to save.")
+        return
+
+    file_path = Path.cwd() / "output" / file_name
+    existing_data = []
+
+    if file_path.exists():
+        with open(file_path, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            existing_data = [row for row in reader]
+
+    combined_data = list({item['id']: item for item in existing_data + news_data}.values())
+
+    if not combined_data:
+        print("No combined data to save.")
+        return
+
+    with open(file_path, 'w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=combined_data[0].keys())
+        writer.writeheader()
+        writer.writerows(combined_data)
+
+    print(f"Data successfully saved to {file_path}")
 
 def delta_date(start_date,end_date):
 
@@ -24,14 +51,13 @@ def get_tickers():
     for row in table.findAll('tr')[1:]:
         ticker = row.findAll('td')[0].text.strip('\n')
         tickers.append(ticker)
-
     return tickers
 
 
 class Init():
     def __init__(self):
 
-        #initialize value here
+        #initialize values here
         self.start_date = "2023-10-21"
         self.end_date = "2023-10-22"
         self.tickers = ['AMZN']
@@ -60,6 +86,9 @@ class FinnHub():
         self.max_call = 60
         self.time_sleep = 60
         self.nb_request = 0
+        self.max_call_per_second = 30  # FinnHub API limit
+        self.request_count = 0
+        self.last_request_time = time.time()
         self.finhub_key = config('FINHUB_KEY')
         self.news_header = ['category', 'datetime','headline','id','image','related','source','summary','url']
         self.start_date = start_date
@@ -72,13 +101,14 @@ class FinnHub():
         self.start_date_ = start_date_ 
         self.end_date_ = end_date_
         
-        tickers = get_tickers()
+        self.tickers = get_tickers()
 
         for ticker_ in self.tickers:
-            self.js_data.clear()
             self.ticker = ticker_ + '_'
             self.ticker_request = ticker_
             self.req_new()
+
+        self.save_data()     
 
     def iterate_day(func):
         """ Decorator that makes the API call on FinHub each days between the `self.start_date`
@@ -99,19 +129,38 @@ class FinnHub():
                     self.nb_request=0
         return wrapper_
     
+    def check_rate_limit(self):
+        current_time = time.time()
+        # Reset count if more than a second has passed
+        if current_time - self.last_request_time > 1:
+            self.request_count = 0
+            self.last_request_time = current_time
+        else:
+            self.request_count += 1
+            if self.request_count >= self.max_call_per_second:
+                print("Sleeping as the request per minute exceeded the Finnhub API limit")
+                time.sleep(1 - (current_time - self.last_request_time))
+                self.request_count = 0
+                self.last_request_time = time.time()
+    
     @iterate_day
     def req_new(self, date_):
         """ Method that makes news request(s) to the Finnhub API"""
+        self.check_rate_limit()
         try:
             request_ = requests.get('https://finnhub.io/api/v1/company-news?symbol=' + self.ticker_request + '&from=' +
                                     date_ + '&to=' + date_ + '&token=' + self.finhub_key)
-            request_.raise_for_status()  # Raises an HTTPError if the HTTP request returned an unsuccessful status code
+            request_.raise_for_status()
             news_data = request_.json()
-            print(news_data)
+            #print(news_data)
             self.js_data += news_data
         except requests.RequestException as e:
             print(f"Error while fetching data for date {date_}: {e}")
 
+    def save_data(self):
+        save_to_csv(self.js_data, 'news_data.csv') 
+
 init_ = Init()
 finhub = FinnHub(start_date=init_.start_date, end_date=init_.end_date,start_date_=init_.start_date_ ,
                 end_date_ =init_.end_date_, tickers=init_.tickers)
+# finhub.save_data() 
