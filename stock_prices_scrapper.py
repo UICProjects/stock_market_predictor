@@ -59,7 +59,7 @@ init_ = Init()
 file_name = "historical_stock_prices.csv"
 filepath = Path.cwd() / "output" / file_name
 end_date = datetime.now()
-start_date = end_date - timedelta(days=1)  # Last year
+start_date = end_date - timedelta(days=365)  # Last year
 formatted_start_date = start_date.strftime('%Y-%m-%d')
 formatted_end_date = end_date.strftime('%Y-%m-%d')
 
