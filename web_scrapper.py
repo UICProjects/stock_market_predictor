@@ -93,8 +93,8 @@ class Finnhub():
                     print(f"Error in thread: {e}")
 
 tickers = get_tickers() 
-end_date = datetime.now() - timedelta(days=202)
-start_date = end_date - timedelta(days=300)  # Last year
+end_date = datetime.now() - timedelta(days=302)
+start_date = end_date - timedelta(days=60)  # Last year
 formatted_start_date = start_date.strftime('%Y-%m-%d')
 formatted_end_date = end_date.strftime('%Y-%m-%d')
 
