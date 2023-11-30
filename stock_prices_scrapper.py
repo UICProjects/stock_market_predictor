@@ -48,9 +48,9 @@ class HistoricalReturn(Init):
         """
 
         self.pd_data = yf.download(self.ticker, 
-                                   start=self.start_date_, 
-                                   end=self.end_date_, 
-                                   progress=False)
+                                start=self.start_date_, 
+                                end=self.end_date_, 
+                                progress=False)
         if not self.pd_data.empty:
             self.pd_data['Ticker'] = self.ticker
         return self.pd_data
